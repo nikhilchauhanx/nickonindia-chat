@@ -1,0 +1,51 @@
+# The 'version' attribute is obsolete and has been removed.
+services:
+  # Redis for distributed state management
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "6379:6379"
+    networks:
+      - video-chat-net
+
+  # Scalable Node.js Signaling Server
+  server:
+    build:
+      context: ./server
+    container_name: signaling_server
+    # We now explicitly define the variables here.
+    # Docker Compose automatically reads the .env file to get the values.
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MEDIASOUP_ANNOUNCED_IP=${MEDIASOUP_ANNOUNCED_IP}
+      - PORT=4000
+    depends_on:
+      - redis
+    ports:
+      - "4000:4000"
+      - "20000-20020:20000-20020/udp"
+    networks:
+      - video-chat-net
+
+  # Next.js Frontend Client
+  client:
+    build:
+      context: ./client
+      args:
+        - NEXT_PUBLIC_SIGNALING_SERVER_URL=http://localhost:4000
+    container_name: client_app
+    ports:
+      - "3000:3000"
+    networks:
+      - video-chat-net
+    environment:
+      - NEXT_PUBLIC_SIGNALING_SERVER_URL=http://localhost:4000
+    depends_on:
+      - server
+
+networks:
+  video-chat-net:
+    driver: bridge
